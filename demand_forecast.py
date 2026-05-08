@@ -1,13 +1,32 @@
+# -------------------------------
+# Core libraries
+# -------------------------------
 import streamlit as st
 import pandas as pd
+
+# -------------------------------
+# Modelling
+# -------------------------------
 from prophet import Prophet
+
+# -------------------------------
+# Visualisation
+# -------------------------------
 import plotly.graph_objects as go
+import plotly.io as pio
+
+pio.templates.default = "plotly_white"
+# -------------------------------
+# Utilities
+# -------------------------------
 from io import StringIO
 import markdown
 
 # --------------------------------------------------
 # PAGE CONFIG
 # --------------------------------------------------
+
+
 st.set_page_config(
     page_title="Demand Forecast",
     layout="wide"
@@ -25,6 +44,30 @@ st.markdown(
 
     """
 )
+
+# --------------------------------------------------
+# USER INSTRUCTIONS
+# --------------------------------------------------
+
+st.subheader("📂 Upload your data")
+
+st.info("""
+Upload a CSV file containing **monthly activity data**.
+
+Your file should include at least:
+- A **month column** in **DD/MM/YYYY format**
+- An **activity column** (numeric values)
+
+Example:
+
+| Month      | Activity |
+|------------|----------|
+| 01/01/2023 | 1200     |
+| 01/02/2023 | 1150     |
+| 01/03/2023 | 1300     |
+
+For a more reliable forecast, you should include **at least** 2 years' worth of data.
+""")
 
 # --------------------------------------------------
 # FILE UPLOAD
@@ -336,7 +379,7 @@ elif direction == "decrease":
     Volumes are projected to fall by approximately **{abs(pct_change):.1%}**
     over the next {narrative_window} months.
 
-    This may reflect structural changes in referral behaviour or service configuration.
+    This may reflect structural changes in activity behaviour or service configuration.
     Any apparent easing in pressure should be interpreted cautiously and validated
     against service intelligence before adjusting capacity.
     """
@@ -386,13 +429,13 @@ if len(last_year_actuals) >= 3 and len(forecast_period) >= 3:
     with col_ly:
         st.metric(
             "Average last year",
-            f"{last_year_mean:,.0f} referrals / month"
+            f"{last_year_mean:,.0f} activities / month"
         )
 
     with col_fc:
         st.metric(
             label="Forecast average",
-            value=f"{forecast_mean:,.0f} referrals / month",
+            value=f"{forecast_mean:,.0f} activities / month",
             delta=f"{yoy_change_pct:+.1%}"
         )
 
@@ -411,7 +454,7 @@ if len(last_year_actuals) >= 3 and len(forecast_period) >= 3:
     elif yoy_change_pct < -0.05:
         comparison_narrative = f"""
         Demand over the next {comparison_months} months is expected to be
-        **lower than last year**, averaging around **{abs(yoy_change_pct):.1%} fewer referrals**
+        **lower than last year**, averaging around **{abs(yoy_change_pct):.1%} fewer activities**
         per month.
 
         Any apparent reduction in demand should be validated against operational
@@ -451,12 +494,12 @@ with st.expander("❓How to read the forecast"):
 
     st.caption(
         """
-        - **Dots and solid line** show actual referral activity
+        - **Dots and solid line** show actual activity
         - The **shaded region** shows the forecast period
         - The central forecast line represents the **most likely** future path
         - The surrounding band reflects **plausible variation**, not error
 
-        Actual referrals are expected to fluctuate within this range rather than
+        Actual activities are expected to fluctuate within this range rather than
         track the central line exactly
 
         **Capacity interpretation**
@@ -492,7 +535,7 @@ fig.add_trace(go.Scatter(
     x=df["ds"],
     y=df["y"],
     mode="lines+markers",
-    name="Actual referrals",
+    name="Actual activities",
     line=dict(color=NHS_BLUE, width=2),
     marker=dict(size=6),
     hovertemplate="Actual: %{y:,.0f}<extra></extra>"
@@ -624,10 +667,10 @@ st.markdown(f"""
 ### Interpretation
 
 - To **avoid all capacity breaches**, the service would need capacity of approximately
-  **{max_required_capacity:,.0f} referrals per month**.
+  **{max_required_capacity:,.0f} activities per month**.
 
 - To meet demand in **most months (90%)**, capacity of approximately
-  **{p90_required_capacity:,.0f} referrals per month** would be sufficient.
+  **{p90_required_capacity:,.0f} activities per month** would be sufficient.
 
 This reflects a trade‑off between **resilience (higher capacity)** and **efficiency (lower cost)**.
 """)
@@ -639,7 +682,7 @@ This reflects a trade‑off between **resilience (higher capacity)** and **effic
 st.subheader("📊 Understanding demand patterns")
 
 st.markdown("""
-These charts show how referral demand behaves over time:
+These charts show how demand behaves over time:
 
 - **Trend** shows whether demand is increasing, stable, or decreasing over time  
 - **Seasonality** shows which months tend to be consistently higher or lower than average
@@ -658,7 +701,7 @@ trend_fig.add_trace(go.Scatter(
     x=df["ds"],
     y=df["y"],
     mode="markers",
-    name="Actual referrals",
+    name="Actual activities",
     marker=dict(size=6, color="#005EB8"),
     opacity=0.6
 ))
@@ -681,9 +724,9 @@ trend_fig.add_vline(
 )
 
 trend_fig.update_layout(
-    title="Long‑term trend in referral demand",
+    title="Long‑term trend in demand",
     xaxis_title="Month",
-    yaxis_title="Referrals per month",
+    yaxis_title="activities per month",
     hovermode="x unified",
     legend=dict(orientation="h", y=-0.25)
 )
@@ -691,7 +734,7 @@ trend_fig.update_layout(
 st.plotly_chart(trend_fig, width='stretch')
 
 st.caption(
-    "The trend reflects long‑term structural changes in referrals, smoothing out "
+    "The trend reflects long‑term structural changes in activities, smoothing out "
     "short‑term variation. Use this to assess whether demand is increasing, stable, or decreasing."
 )
 
@@ -785,7 +828,7 @@ st.plotly_chart(seasonality_fig, width='stretch')
 st.markdown(f"""
 ### 🍂Seasonal interpretation
 
-Referral demand follows a consistent **within‑year pattern**:
+Demand follows a consistent **within‑year pattern**:
 
 - Demand tends to be **highest in {peak_month}**
 - Demand tends to be **lowest in {low_month}**
@@ -905,7 +948,7 @@ if st.button("Generate report"):
         html_buffer.write(f"""
         <html>
         <head>
-            <title>Referral Demand Forecast Report</title>
+            <title>Demand Forecast Report</title>
             <style>
                 body {{
                     font-family: Arial, sans-serif;
@@ -954,10 +997,10 @@ if st.button("Generate report"):
 
         <body>
 
-        <h1>Referral Demand Forecast</h1>
+        <h1>Demand Forecast</h1>
 
         <p>
-        This report summarises projected referral demand and associated capacity risks.
+        This report summarises projected demand and associated capacity risks.
         It is intended to support planning, workforce decisions, and service discussions.
         </p>
         """)
