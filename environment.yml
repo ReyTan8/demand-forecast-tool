@@ -1,0 +1,12 @@
+name: forecast
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - streamlit
+      - pandas
+      - plotly
+      - prophet
+      - markdown
