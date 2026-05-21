@@ -21,6 +21,7 @@ pio.templates.default = "plotly_white"
 # -------------------------------
 from io import StringIO
 import markdown
+import textwrap
 
 # --------------------------------------------------
 # PAGE CONFIG
@@ -41,6 +42,8 @@ st.markdown(
 
     The forecast describes a **likely range of demand**, not a precise prediction.
     Observed activity will always vary month‑to‑month due to operational and external factors.
+
+    Existing backlog is **not** included in the forecast.
 
     """
 )
@@ -223,7 +226,6 @@ with st.sidebar.expander("🏥 Capacity assumptions"):
 
         is_override = value != base_capacity
 
-        # Label tweak to show overrides
         label = f"{m}"
         if is_override:
             label += " *"  # simple visual indicator
@@ -327,155 +329,6 @@ capacity_df = forecast[["ds"]].copy()
 capacity_df["month"] = capacity_df["ds"].dt.month_name()
 
 capacity_df["capacity"] = capacity_df["month"].map(monthly_capacity)
-
-
-
-# --------------------------------------------------
-# AUTO-GENERATED FORECAST NARRATIVE
-# --------------------------------------------------
-
-st.subheader("📝 Forecast interpretation")
-
-st.caption(
-    "This narrative is automatically generated from the forecast trend and should "
-    "be interpreted alongside service knowledge and operational context."
-)
-
-# Use recent forecast period for direction assessment
-narrative_window = min(12, forecast_horizon)
-
-recent_forecast = forecast.tail(narrative_window)
-
-start_value = recent_forecast["yhat"].iloc[0]
-end_value = recent_forecast["yhat"].iloc[-1]
-
-pct_change = (end_value - start_value) / start_value
-
-# Classify direction using conservative thresholds
-if pct_change > 0.05:
-    direction = "increase"
-elif pct_change < -0.05:
-    direction = "decrease"
-else:
-    direction = "stable"
-
-# Generate narrative text
-if direction == "increase":
-    narrative_text = f"""
-    **Demand is expected to increase over the forecast period.**
-
-    Based on recent trends, volumes are projected to rise by approximately
-    **{pct_change:.1%}** over the next {narrative_window} months.
-
-    This suggests growing pressure on service capacity if current delivery models
-    remain unchanged. Planning should consider whether capacity is sufficient to absorb higher activity levels,
-    particularly during seasonal peaks.
-    """
-
-elif direction == "decrease":
-    narrative_text = f"""
-    **Demand is expected to decrease slightly over the forecast period.**
-
-    Volumes are projected to fall by approximately **{abs(pct_change):.1%}**
-    over the next {narrative_window} months.
-
-    This may reflect structural changes in activity behaviour or service configuration.
-    Any apparent easing in pressure should be interpreted cautiously and validated
-    against service intelligence before adjusting capacity.
-    """
-
-else:
-    narrative_text = f"""
-    **Demand is expected to remain broadly stable over the forecast period.**
-
-    Volumes are projected to change by less than **±5%** over the next
-    {narrative_window} months, suggesting no strong upward or downward trend.
-
-    Planning efforts should therefore focus on managing predictable seasonal peaks
-    and operational variation rather than long‑term growth or decline.
-    """
-
-st.info(narrative_text)
-
-
-
-# --------------------------------------------------
-# COMPARISON TO LAST YEAR'S ACTUALS
-# --------------------------------------------------
-
-st.subheader("📊 Comparison to last year")
-
-# Determine comparison window (up to 12 months)
-comparison_months = min(12, forecast_horizon)
-
-# Last year actuals
-last_year_actuals = df.tail(comparison_months)
-
-# Corresponding forecast period
-forecast_period = forecast[forecast["ds"] > df["ds"].max()].head(comparison_months)
-
-# Only proceed if both periods are available
-if len(last_year_actuals) >= 3 and len(forecast_period) >= 3:
-
-    last_year_mean = last_year_actuals["y"].mean()
-    forecast_mean = forecast_period["yhat"].mean()
-
-    yoy_change_pct = (forecast_mean - last_year_mean) / last_year_mean
-
-    # Headline metrics
-    
-    col_ly, col_fc= st.columns(2)
-
-    with col_ly:
-        st.metric(
-            "Average last year",
-            f"{last_year_mean:,.0f} activities / month"
-        )
-
-    with col_fc:
-        st.metric(
-            label="Forecast average",
-            value=f"{forecast_mean:,.0f} activities / month",
-            delta=f"{yoy_change_pct:+.1%}"
-        )
-
-
-    # Narrative interpretation
-    if yoy_change_pct > 0.05:
-        comparison_narrative = f"""
-        Demand over the next {comparison_months} months is expected to be
-        **higher than last year**, averaging around **{yoy_change_pct:.1%} more activity**
-        per month.
-
-        This suggests increasing pressure compared to the same period last year.
-        Capacity and workforce plans should be reviewed to ensure they remain
-        resilient to sustained higher volumes.
-        """
-    elif yoy_change_pct < -0.05:
-        comparison_narrative = f"""
-        Demand over the next {comparison_months} months is expected to be
-        **lower than last year**, averaging around **{abs(yoy_change_pct):.1%} fewer activities**
-        per month.
-
-        Any apparent reduction in demand should be validated against operational
-        intelligence before assuming a sustained easing of pressure.
-        """
-    else:
-        comparison_narrative = f"""
-        Demand over the next {comparison_months} months is expected to be
-        **broadly similar to last year**, with changes within ±5%.
-
-        Planning focus should remain on managing seasonal peaks and operational
-        variability rather than significant year‑on‑year growth or decline.
-        """
-
-    st.info(comparison_narrative)
-
-else:
-    st.info(
-        "Not enough historical or forecast data is available to provide a "
-        "robust comparison with last year."
-    )
 
 # --------------------------------------------------
 # NHS COLOUR PALETTE
@@ -622,6 +475,167 @@ fig.add_trace(go.Scatter(
 
 st.plotly_chart(fig, width='stretch')
 
+
+
+
+# --------------------------------------------------
+# AUTO-GENERATED FORECAST NARRATIVE
+# --------------------------------------------------
+
+# Use recent forecast period for direction assessment
+narrative_window = min(12, forecast_horizon)
+
+recent_forecast = forecast.tail(narrative_window)
+
+start_value = recent_forecast["yhat"].iloc[0]
+end_value = recent_forecast["yhat"].iloc[-1]
+
+pct_change = (end_value - start_value) / start_value
+
+# Classify direction using conservative thresholds
+if pct_change > 0.05:
+    direction = "increase"
+elif pct_change < -0.05:
+    direction = "decrease"
+else:
+    direction = "stable"
+
+
+# --------------------------------------------------
+# COMPARISON TO LAST YEAR'S ACTUALS
+# --------------------------------------------------
+
+st.subheader("📊 Comparison to last year")
+
+# Determine comparison window (up to 12 months)
+comparison_months = min(12, forecast_horizon)
+
+# Last year actuals
+last_year_actuals = df.tail(comparison_months)
+
+# Corresponding forecast period
+forecast_period = forecast[forecast["ds"] > df["ds"].max()].head(comparison_months)
+
+# Only proceed if both periods are available
+if len(last_year_actuals) >= 3 and len(forecast_period) >= 3:
+
+    last_year_mean = last_year_actuals["y"].mean()
+    forecast_mean = forecast_period["yhat"].mean()
+
+    yoy_change_pct = (forecast_mean - last_year_mean) / last_year_mean
+
+    # Headline metrics    
+    col_ly, col_fc= st.columns(2)
+
+    with col_ly:
+        st.metric(
+            "Average last year",
+            f"{last_year_mean:,.0f} activities / month"
+        )
+
+    with col_fc:
+        st.metric(
+            label="Forecast average",
+            value=f"{forecast_mean:,.0f} activities / month",
+            delta=f"{yoy_change_pct:+.1%}"
+        )
+
+else:
+    st.info(
+        "Not enough historical or forecast data is available to provide a "
+        "robust comparison with last year."
+    )
+
+# --------------------------------------------------
+# COMBINED FORECAST SUMMARY
+# --------------------------------------------------
+
+st.subheader("📝 Forecast interpretation")
+
+st.caption(
+    "This narrative is automatically generated from the forecast trend and should "
+    "be interpreted alongside service knowledge and operational context."
+)
+
+trend_change = pct_change
+avg_change = yoy_change_pct
+
+# --- Scenario 1: Rising and above last year ---
+if trend_change > 0 and avg_change > 0.05:
+
+    summary_text = f"""
+    **Demand is expected to increase over the forecast period.**
+
+    - Activity volumes are projected to rise by approximately **{trend_change:.1%} overall**
+    from the start to the end of the next {narrative_window} months.
+    - On average, demand is expected to be around **{avg_change:.1%} higher than the most recent year**,
+    indicating sustained upward pressure.
+
+    This suggests both a **higher level of demand** and **continued growth**, with increasing
+    capacity pressures over time.
+    """
+
+# --- Scenario 2: Falling but still above last year ---
+elif trend_change < 0 and avg_change > 0.05:
+
+    summary_text = f"""
+    **Demand is expected to decrease over the forecast period, following a period of higher activity.**
+
+    - Activity volumes are projected to change by approximately **{trend_change:.1%} overall**
+    across the next {narrative_window} months.
+    - However, average demand remains around **{avg_change:.1%} higher than the most recent year**,
+    indicating that activity is still elevated compared to historical levels.
+
+    This suggests that while pressures may ease over time, the service may still need to
+    operate at **higher-than-usual capacity levels** in the near term.
+    """
+
+# --- Scenario 3: Rising but below last year ---
+elif trend_change > 0 and avg_change < -0.05:
+
+    summary_text = f"""
+    **Demand is expected to increase over the forecast period, from a currently lower level.**
+
+    - Activity volumes are projected to rise by approximately **{trend_change:.1%} overall**
+    across the next {narrative_window} months.
+    - Despite this upward trend, average demand is still expected to be around
+    **{abs(avg_change):.1%} lower than the most recent year**.
+
+    This suggests a **recovery in demand**, although overall activity may remain below
+    previous levels.
+    """
+
+# --- Scenario 4: Falling and below last year ---
+elif trend_change < 0 and avg_change < -0.05:
+
+    summary_text = f"""
+    **Demand is expected to decrease over the forecast period.**
+
+    - Activity volumes are projected to change by approximately **{trend_change:.1%} overall**
+    across the next {narrative_window} months.
+    - On average, demand is expected to be around **{abs(avg_change):.1%} lower than the most recent year**,
+    indicating a sustained reduction in activity.
+
+    This suggests a **general easing of demand pressures**, although seasonal variation may remain.
+    """
+
+# --- Scenario 5: Stable / mixed ---
+else:
+
+    summary_text = f"""
+    **Demand is expected to remain broadly stable over the forecast period.**
+
+    - Activity volumes are projected to change by approximately **{trend_change:.1%} overall**
+    across the next {narrative_window} months.
+    - On average, demand is expected to be **within ±5% of the most recent year**.
+
+    This suggests broadly stable activity levels, with variation driven mainly by
+    seasonal patterns and short-term fluctuations.
+    """
+
+st.info(summary_text)
+
+
 # --------------------------------------------------
 # REQUIRED CAPACITY CALCULATION
 # --------------------------------------------------
@@ -663,16 +677,11 @@ with col3:
         f"{p90_required_capacity:,.0f}"
     )
 
-st.markdown(f"""
-### Interpretation
-
-- To **avoid all capacity breaches**, the service would need capacity of approximately
-  **{max_required_capacity:,.0f} activities per month**.
-
-- To meet demand in **most months (90%)**, capacity of approximately
-  **{p90_required_capacity:,.0f} activities per month** would be sufficient.
-
-This reflects a trade‑off between **resilience (higher capacity)** and **efficiency (lower cost)**.
+st.info(f"""
+    - To **avoid all capacity breaches**, the service would need capacity of approximately
+    **{max_required_capacity:,.0f} activities per month**.
+    - To meet demand in **most months (90%)**, capacity of approximately
+    **{p90_required_capacity:,.0f} activities per month** would be sufficient.
 """)
 
 # --------------------------------------------------
@@ -821,8 +830,13 @@ seasonality_fig.update_layout(
 
 st.plotly_chart(seasonality_fig, width='stretch')
 
+st.caption(
+    "Values represent typical deviation from the average month. "
+    "They reflect recurring seasonal patterns rather than one‑off events."
+)
+
 # --------------------------------------------------
-# SEASONALITY NARRATIVE (AUTO-GENERATED)
+# SEASONALITY NARRATIVE
 # --------------------------------------------------
 
 st.markdown(f"""
@@ -838,10 +852,7 @@ This reflects predictable seasonal pressures rather than structural change.
 Planning should ensure sufficient capacity during **peak months**, even if overall demand appears stable.
 """)
 
-st.caption(
-    "Values represent typical deviation from the average month. "
-    "They reflect recurring seasonal patterns rather than one‑off events."
-)
+
 
 # --------------------------------------------------
 # DOWNLOAD CSV
@@ -928,181 +939,140 @@ p90_required_capacity = future_forecast["yhat"].quantile(0.90)
 
 
 # --------------------------------------------------
-# HTML REPORT EXPORT
+# HTML REPORT EXPORT (WITH INTERACTIVE CHARTS)
 # --------------------------------------------------
-
-
 
 st.subheader("📄 Export report")
 
+def generate_html_report():
+
+    clean_summary = textwrap.dedent(summary_text).strip()
+    summary_html = markdown.markdown(clean_summary)
+
+    forecast_chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+    trend_chart_html = trend_fig.to_html(full_html=False, include_plotlyjs=False)
+    seasonality_chart_html = seasonality_fig.to_html(full_html=False, include_plotlyjs=False)
+
+    report_html = f"""
+    <html>
+    <head>
+        <title>Demand Forecast Report</title>
+
+        <!-- Load Plotly once -->
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 40px;
+                color: #222;
+                line-height: 1.5;
+            }}
+
+            h1 {{
+                color: #005EB8;
+                border-bottom: 3px solid #005EB8;
+                padding-bottom: 10px;
+            }}
+
+            h2 {{
+                color: #003087;
+                margin-top: 30px;
+            }}
+
+            .box {{
+                background-color: #E8EDEE;
+                padding: 15px;
+                border-left: 6px solid #005EB8;
+                margin-top: 10px;
+            }}
+
+            .metric {{
+                margin: 4px 0;
+                font-size: 15px;
+            }}
+
+            .chart {{
+                margin-top: 20px;
+            }}
+
+            .footer {{
+                margin-top: 40px;
+                font-size: 12px;
+                color: #666;
+                border-top: 1px solid #ddd;
+                padding-top: 10px;
+            }}
+        </style>
+
+    </head>
+
+    <body>
+
+        <h1>📈 Demand Forecast Report</h1>
+
+        <!-- Executive Summary -->
+        <h2>Executive Summary</h2>
+        <div class="box">
+            {summary_html}
+        </div>
+
+        <!-- Forecast Chart -->
+        <h2>Forecast</h2>
+        <div class="chart">
+            {forecast_chart_html}
+        </div>
+
+        <!-- Comparison -->
+        <h2>Comparison to Last Year</h2>
+        <p class="metric"><b>Last year average:</b> {last_year_avg:,.0f}</p>
+        <p class="metric"><b>Forecast average:</b> {forecast_avg:,.0f}</p>
+
+        <!-- Capacity -->
+        <h2>Capacity & Demand</h2>
+        <p class="metric"><b>Average capacity:</b> {avg_capacity:,.0f}</p>
+        <p class="metric"><b>Months above capacity:</b> {breach_months}</p>
+        <p class="metric"><b>Total excess demand:</b> {excess_demand:,.0f}</p>
+
+        <!-- Required Capacity -->
+        <h2>Required Capacity</h2>
+        <p class="metric"><b>To avoid all breaches:</b> {max_required_capacity:,.0f}</p>
+        <p class="metric"><b>For 90% of months:</b> {p90_required_capacity:,.0f}</p>
+
+        <!-- Trend Chart -->
+        <h2>Trend Analysis</h2>
+        <div class="chart">
+            {trend_chart_html}
+        </div>
+
+        <!-- Seasonality Chart -->
+        <h2>Seasonality</h2>
+        <div class="chart">
+            {seasonality_chart_html}
+        </div>
+
+        <p class="metric"><b>Peak month:</b> {peak_month}</p>
+        <p class="metric"><b>Lowest month:</b> {low_month}</p>
+
+        <div class="footer">
+            This report is automatically generated and should be interpreted alongside 
+            operational and clinical context.
+        </div>
+
+    </body>
+    </html>
+    """
+
+    return report_html
+
+
 if st.button("Generate report"):
 
-    with st.spinner("Preparing report..."):
-
-        html_buffer = StringIO()
-
-        # --------------------------------------------------
-        # HTML STRUCTURE
-        # --------------------------------------------------
-
-        html_buffer.write(f"""
-        <html>
-        <head>
-            <title>Demand Forecast Report</title>
-            <style>
-                body {{
-                    font-family: Arial, sans-serif;
-                    margin: 40px;
-                    background-color: #ffffff;
-                    color: #003087;
-                }}
-
-                h1 {{
-                    color: #005EB8;
-                    border-bottom: 3px solid #005EB8;
-                    padding-bottom: 10px;
-                }}
-
-                h2 {{
-                    color: #003087;
-                    border-bottom: 1px solid #E8EDEE;
-                    padding-top: 20px;
-                }}
-
-                p {{
-                    line-height: 1.6;
-                    font-size: 14px;
-                }}
-
-                .metric-box {{
-                    background: #F2F7FA;
-                    padding: 15px;
-                    margin: 10px 0;
-                    border-left: 5px solid #005EB8;
-                }}
-
-                .warning {{
-                    background: #FFF4E5;
-                    border-left: 5px solid #FFB81C;
-                    padding: 10px;
-                }}
-
-                .good {{
-                    background: #E6F4EA;
-                    border-left: 5px solid #007F3B;
-                    padding: 10px;
-                }}
-            </style>
-        </head>
-
-        <body>
-
-        <h1>Demand Forecast</h1>
-
-        <p>
-        This report summarises projected demand and associated capacity risks.
-        It is intended to support planning, workforce decisions, and service discussions.
-        </p>
-        """)
-
-        # --------------------------------------------------
-        # EXECUTIVE SUMMARY
-        # --------------------------------------------------
-
-        
-        narrative_html = markdown.markdown(narrative_text, extensions=["nl2br"])
-
-        html_buffer.write(f"""
-        <h2>Executive Summary</h2>
-        {narrative_html}
-        """)
-
-
-        # --------------------------------------------------
-        # FORECAST CHART
-        # --------------------------------------------------
-
-        html_buffer.write("<h2>Demand Forecast</h2>")
-        html_buffer.write(fig.to_html(full_html=False, include_plotlyjs='cdn'))
-
-        # --------------------------------------------------
-        # COMPARISON TO LAST YEAR
-        # --------------------------------------------------
-
-        html_buffer.write("<h2>Comparison to Last Year</h2>")
-        html_buffer.write(f"""
-        <div class="metric-box">
-            <strong>Average last year:</strong> {last_year_avg:,.0f}<br>
-            <strong>Forecast average:</strong> {forecast_avg:,.0f}<br>
-            <strong>Change:</strong> {pct_change:+.1%}
-        </div>
-        """)
-
-        # --------------------------------------------------
-        # CAPACITY ANALYSIS
-        # --------------------------------------------------
-
-        html_buffer.write("<h2>Capacity Analysis</h2>")
-        html_buffer.write(f"""
-        <div class="metric-box">
-            <strong>Months above capacity:</strong> {breach_months}<br>
-            <strong>Total unmet demand:</strong> {excess_demand:,.0f}
-        </div>
-        """)
-
-        # Recommendation message
-        if breach_months > 0:
-            html_buffer.write(f"""
-            <div class="warning">
-            Demand is expected to exceed capacity in {breach_months} months.
-            Additional capacity or mitigation strategies should be considered.
-            </div>
-            """)
-        else:
-            html_buffer.write("""
-            <div class="good">
-            Forecast demand remains within capacity.
-            </div>
-            """)
-
-        # --------------------------------------------------
-        # REQUIRED CAPACITY
-        # --------------------------------------------------
-
-        html_buffer.write("<h2>Required Capacity</h2>")
-        html_buffer.write(f"""
-        <div class="metric-box">
-            <strong>To avoid all breaches:</strong> {max_required_capacity:,.0f}<br>
-            <strong>Typical (90% demand):</strong> {p90_required_capacity:,.0f}
-        </div>
-        """)
-
-        # --------------------------------------------------
-        # TREND & SEASONALITY
-        # --------------------------------------------------
-
-        html_buffer.write("<h2>Demand Patterns</h2>")
-        html_buffer.write(trend_fig.to_html(full_html=False, include_plotlyjs=False))
-        html_buffer.write(seasonality_fig.to_html(full_html=False, include_plotlyjs=False))
-
-        html_buffer.write(f"""
-        <p>
-        Demand tends to peak in <strong>{peak_month}</strong> and is lowest in
-        <strong>{low_month}</strong>, reflecting predictable seasonal pressure.
-        </p>
-        """)
-
-        # --------------------------------------------------
-        # CLOSE HTML
-        # --------------------------------------------------
-
-        html_buffer.write("</body></html>")
-
-        report_html = html_buffer.getvalue()
+    html_report = generate_html_report()
 
     st.download_button(
         label="⬇️ Download HTML report",
-        data=report_html,
+        data=html_report,
         file_name="demand_forecast_report.html",
         mime="text/html"
     )
