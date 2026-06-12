@@ -95,7 +95,7 @@ if file_name.endswith(".csv"):
     df_raw = pd.read_csv(uploaded_file)
 
 elif file_name.endswith(".xlsx"):
-    df_raw = pd.read_excel(uploaded_file, engine="openpyxl")
+    df_raw = pd.read_excel(uploaded_file)
 
 else:
     st.error("Unsupported file type. Please upload a CSV or Excel (.xlsx) file.")
