@@ -55,7 +55,7 @@ st.markdown(
 st.subheader("📂 Upload your data")
 
 st.info("""
-Upload a CSV file containing **monthly activity data**.
+Upload a CSV or Excel (.xlsx) file containing **monthly activity data**.
 
 Your file should include at least:
 - A **month column** in **DD/MM/YYYY format**
@@ -75,19 +75,36 @@ For a more reliable forecast, you should include **at least** 2 years' worth of 
 # --------------------------------------------------
 # FILE UPLOAD
 # --------------------------------------------------
+
 uploaded_file = st.file_uploader(
-    "Upload monthly activity CSV (DD/MM/YYYY format)",
-    type=["csv"]
+    "Upload monthly referral file",
+    type=["csv", "xlsx"]
 )
 
 if uploaded_file is None:
-    st.info("Please upload a CSV file to begin.")
+    st.info("Please upload a CSV or Excel (.xlsx) file to begin.")
     st.stop()
 
 # --------------------------------------------------
-# DATA LOAD + COLUMN SELECTION
+# LOAD FILE (CSV OR EXCEL)
 # --------------------------------------------------
-df_raw = pd.read_csv(uploaded_file)
+
+file_name = uploaded_file.name
+
+if file_name.endswith(".csv"):
+    df_raw = pd.read_csv(uploaded_file)
+
+elif file_name.endswith(".xlsx"):
+    df_raw = pd.read_excel(uploaded_file, engine="openpyxl")
+
+else:
+    st.error("Unsupported file type. Please upload a CSV or Excel (.xlsx) file.")
+    st.stop()
+
+# --------------------------------------------------
+# COLUMN SELECTION
+# --------------------------------------------------
+
 
 col_left, col_right = st.columns([2, 1])
 
@@ -114,17 +131,33 @@ with col_right:
 # --------------------------------------------------
 # DATA PREPARATION
 # --------------------------------------------------
-df = df_raw.copy()
 
-df["ds"] = pd.to_datetime(
-    df[DATE_COLUMN],
+# Convert date column safely
+df_raw[DATE_COLUMN] = pd.to_datetime(
+    df_raw[DATE_COLUMN],
     format="%d/%m/%Y",
-    dayfirst=True
+    dayfirst=True,
+    errors="coerce"  # invalid → NaT
 )
 
-df["y"] = df[VALUE_COLUMN]
+# Convert value column safely
+df_raw[VALUE_COLUMN] = pd.to_numeric(
+    df_raw[VALUE_COLUMN],
+    errors="coerce"  # invalid → NaN
+)
 
-df = df[["ds", "y"]].sort_values("ds").reset_index(drop=True)
+# Drop rows where either is invalid
+df = df_raw.dropna(subset=[DATE_COLUMN, VALUE_COLUMN]).copy()
+
+# Rename for Prophet
+df = df.rename(columns={
+    DATE_COLUMN: "ds",
+    VALUE_COLUMN: "y"
+})
+
+# Sort properly
+df = df.sort_values("ds").reset_index(drop=True)
+
 
 # --------------------------------------------------
 # DATA VALIDATION

@@ -1,5 +1,6 @@
-streamlit
-pandas
-plotly
-prophet
-markdown
+streamlit==1.32.0
+pandas==2.2.2
+plotly==5.21.0
+prophet==1.1.5
+markdown==3.6
+openpyxl==3.1.2
