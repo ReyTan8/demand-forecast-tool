@@ -5,5 +5,5 @@ This Streamlit application forecasts referral demand using Prophet and supports 
 ## Features
 - Demand forecasting
 - Capacity modelling
-- Scenario testing
+- Conversion scenario
 - HTML report export
