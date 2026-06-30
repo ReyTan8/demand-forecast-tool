@@ -1133,8 +1133,8 @@ with tab2:
     try:
         conversion_rate = float(conversion_input) / 100
 
-        if conversion_rate < 0 or conversion_rate > 1:
-            st.warning("Please enter a value between 0 and 100.")
+        if conversion_rate < 0 or conversion_rate > 5:
+            st.warning("Please enter a value between 0 and 500.")
             st.stop()
 
     except ValueError:
